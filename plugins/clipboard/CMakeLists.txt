@@ -1,6 +1,6 @@
 if(UNIX AND NOT APPLE)
     find_package(QtWaylandScanner REQUIRED)
-    find_package(Wayland 1.15 COMPONENTS Client)
+    find_package(Wayland 1.15 REQUIRED COMPONENTS Client)
     find_package(Qt5 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS WaylandClient)
 endif()
 
@@ -24,7 +24,7 @@ if(UNIX AND NOT APPLE)
         BASENAME wlr-data-control-unstable-v1
     )
     set(kdeconnect_clipboard_WL_LINK_LIBS Qt5::GuiPrivate # for native interface to get wl_seat
-    Wayland::Client Qt::WaylandClient)
+    Wayland::Client Qt5::WaylandClient)
 endif()
 
 

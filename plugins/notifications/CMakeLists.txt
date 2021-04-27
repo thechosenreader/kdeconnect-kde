@@ -26,6 +26,6 @@ target_link_libraries(kdeconnect_notifications
 
 if (UNIX AND NOT APPLE)
     target_link_libraries(kdeconnect_notifications
-        Qt::X11Extras
+        Qt5::X11Extras
     )
 endif()

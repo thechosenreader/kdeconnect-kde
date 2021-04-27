@@ -63,13 +63,28 @@ bool RunCommandPlugin::receivePacket(const NetworkPacket& np)
         QJsonObject commands = commandsDocument.object();
         QString key = np.get<QString>(QStringLiteral("key"));
         QJsonValue value = commands[key];
+	
+	QVariantMap np_body = np.body();
+	QVariantMap::iterator i;
+	for (i = np_body.begin(); i != np_body.end(); i++)
+		qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Key: " << i.key() << "\nValue:  " << i.value();
+
         if (value == QJsonValue::Undefined) {
             qCWarning(KDECONNECT_PLUGIN_RUNCOMMAND) << key << "is not a configured command";
         }
-        const QJsonObject commandJson = value.toObject();
-        qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Running:" << COMMAND << ARGS << commandJson[QStringLiteral("command")].toString();
-        QProcess::startDetached(QStringLiteral(COMMAND), QStringList()<< QStringLiteral(ARGS) << commandJson[QStringLiteral("command")].toString());
-        return true;
+
+	else if (np.has(QStringLiteral("rawCommand"))) {
+		QString rawCommand = np.get<QString>(QStringLiteral("rawCommand"));
+        	qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Running:" << COMMAND << ARGS << rawCommand;
+		QProcess::startDetached(QStringLiteral(COMMAND), QStringList() << QStringLiteral(ARGS) << rawCommand);
+	}
+
+	else {
+		const QJsonObject commandJson = value.toObject();
+		qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Running:" << COMMAND << ARGS << commandJson[QStringLiteral("command")].toString();
+		QProcess::startDetached(QStringLiteral(COMMAND), QStringList()<< QStringLiteral(ARGS) << commandJson[QStringLiteral("command")].toString());
+		return true;
+	     }
     } else if (np.has(QStringLiteral("setup"))) {
         Daemon::instance()->openConfiguration(device()->id(), QStringLiteral("kdeconnect_runcommand"));
     }
@@ -92,6 +107,7 @@ void RunCommandPlugin::sendConfig()
         np.set<bool>(QStringLiteral("canAddCommand"), true);
     #endif
 
+    np.set<bool>(QStringLiteral("canAddCommand"), true);
     sendPacket(np);
 }
 

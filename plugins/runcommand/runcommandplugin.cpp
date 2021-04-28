@@ -44,6 +44,7 @@ K_PLUGIN_CLASS_WITH_JSON(RunCommandPlugin, "kdeconnect_runcommand.json")
 RunCommandPlugin::RunCommandPlugin(QObject* parent, const QVariantList& args)
     : KdeConnectPlugin(parent, args)
 {
+    qCDebug(KDECONNECT_PLUGIN_RUNCOMMAND) << "RUNCOMMAND plugin constructor for device" << device()->name();
     connect(config(), &KdeConnectPluginConfig::configChanged, this, &RunCommandPlugin::configChanged);
 }
 
@@ -63,7 +64,7 @@ bool RunCommandPlugin::receivePacket(const NetworkPacket& np)
         QJsonObject commands = commandsDocument.object();
         QString key = np.get<QString>(QStringLiteral("key"));
         QJsonValue value = commands[key];
-	
+
 	QVariantMap np_body = np.body();
 	QVariantMap::iterator i;
 	for (i = np_body.begin(); i != np_body.end(); i++)

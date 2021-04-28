@@ -1,0 +1,63 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "mmotiwala53@gmail.com",
+                "Name": "Mustafa Motiwala",
+                "Name[ar]": "Mustafa Motiwala",
+                "Name[ast]": "Mustafa Motiwala",
+                "Name[az]": "Mustafa Motiwala",
+                "Name[ca@valencia]": "Mustafa Motiwala",
+                "Name[ca]": "Mustafa Motiwala",
+                "Name[cs]": "Mustafa Motiwala",
+                "Name[da]": "Mustafa Motiwala",
+                "Name[de]": "Mustafa Motiwala",
+                "Name[el]": "Mustafa Motiwala",
+                "Name[en_GB]": "Mustafa Motiwala",
+                "Name[es]": "Mustafa Motiwala",
+                "Name[et]": "Mustafa Motiwala",
+                "Name[eu]": "Mustafa Motiwala",
+                "Name[fi]": "Mustafa Motiwala",
+                "Name[fr]": "Mustafa Motiwala",
+                "Name[gl]": "Mustafa Motiwala",
+                "Name[ia]": "Mustafa Motiwala",
+                "Name[id]": "Mustafa Motiwala",
+                "Name[it]": "Mustafa Motiwala",
+                "Name[ko]": "Mustafa Motiwala",
+                "Name[lt]": "Mustafa Motiwala",
+                "Name[nl]": "Mustafa Motiwala",
+                "Name[nn]": "Mustafa Motiwala",
+                "Name[pl]": "Mustafa Motiwala",
+                "Name[pt]": "Mustafa Motiwala",
+                "Name[pt_BR]": "Mustafa Motiwala",
+                "Name[ro]": "Mustafa Motiwala",
+                "Name[ru]": "Mustafa Motiwala",
+                "Name[sk]": "Mustafa Motiwala",
+                "Name[sl]": "Mustafa Motiwala",
+                "Name[sv]": "Mustafa Motiwala",
+                "Name[tr]": "Mustafa Motiwala",
+                "Name[uk]": "Mustafa Motiwala",
+                "Name[x-test]": "xxMustafa Motiwalaxx",
+                "Name[zh_CN]": "Mustafa Motiwala",
+                "Name[zh_TW]": "Mustafa Motiwala"
+            }
+        ],
+        "Description": "View your desktop filesystem remotely",
+        "EnabledByDefault": true,
+        "Icon": "system-run",
+        "Id": "kdeconnect_filemanager",
+        "License": "GPL",
+        "Name": "File Manager",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "0.1",
+        "Website": "https://poopy.com"
+    },
+    "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.filemanager"
+    ],
+    "X-KdeConnect-SupportedPacketType": [
+        "kdeconnect.filemanager.request"
+    ]
+}

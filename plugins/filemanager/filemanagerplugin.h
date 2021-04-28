@@ -7,6 +7,14 @@
 #include <QFileSystemWatcher>
 
 #include <QString>
+#include <QDir>
+#include <QList>
+#include <QFileInfo>
+#include <QtGlobal>
+#include <QFileDevice>
+#include <QDateTime>
+#include <QJsonObject>
+#include <QJsonDocument>
 
 class Q_DECL_EXPORT FileManagerPlugin
     : public KdeConnectPlugin
@@ -23,8 +31,9 @@ public:
     QString dbusPath() const override;
 
 private:
+    void sendListing();
     void sendListing(const QString& path);
-
+    QString permissionsString(QFileDevice::Permissions permissions);
 };
 
 #endif

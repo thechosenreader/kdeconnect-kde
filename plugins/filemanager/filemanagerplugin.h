@@ -15,6 +15,10 @@
 #include <QDateTime>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QVariant>
+#include <QVariantList>
+#include <QUrl>
+#include <QDBusMessage>
 
 class Q_DECL_EXPORT FileManagerPlugin
     : public KdeConnectPlugin
@@ -31,9 +35,12 @@ public:
     QString dbusPath() const override;
 
 private:
-    void sendListing();
+    QDir* directory = new QDir(QDir::homePath());
+    
+    void sendListing(){ sendListing(QDir::homePath()); }
     void sendListing(const QString& path);
     QString permissionsString(QFileDevice::Permissions permissions);
+    void sendFile(const QString& path);
 };
 
 #endif

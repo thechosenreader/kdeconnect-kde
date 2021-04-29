@@ -7,9 +7,9 @@
 #include <core/networkpacket.h>
 #include <core/device.h>
 #include <core/daemon.h>
-
+#include "interfaces/dbushelpers.h"
 #include "plugin_filemanager_debug.h"
-
+#include <dbushelper.h>
 #define PACKET_TYPE_FILEMANAGER QStringLiteral("kdeconnect.filemanager")
 
 K_PLUGIN_CLASS_WITH_JSON(FileManagerPlugin, "kdeconnect_filemanager.json")
@@ -22,15 +22,18 @@ FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "FILEMANAGER plugin constructor for device" << device()->name();
 }
 
+
 FileManagerPlugin::~FileManagerPlugin()
 {
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "FILEMANAGER plugin destructor for device" << device()->name();
 }
 
+
 QString FileManagerPlugin::dbusPath() const
 {
     return QStringLiteral("/modules/kdeconnect/devices/") + device()->id() + QStringLiteral("/filemanager");
 }
+
 
 bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
   if (np.get<bool>(QStringLiteral("requestDirectoryListing"), false)) {
@@ -40,23 +43,30 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
     else
       sendListing();
   }
+
+  else if (np.get<bool>(QStringLiteral("requestDownload"), false)) {
+    if (np.has(QStringLiteral("filepath"))) {
+      QString filepath = np.get<QString>(QStringLiteral("filepath"));
+      sendFile(filepath);
+    }
+  }
   return true;
 }
+
 
 void FileManagerPlugin::connected() {
   sendListing();
 }
 
-void FileManagerPlugin::sendListing() {
-  sendListing(QDir::homePath());
-}
 
 void FileManagerPlugin::sendListing(const QString& path) {
 
   QJsonObject* listing = new QJsonObject();
-  QDir directory(path);
+  directory->cd(path);
+  directory->setPath(directory->absolutePath());
+  qDebug() << "cwd is" << directory->absolutePath();
 
-  QList<QFileInfo> files = directory.entryInfoList(QDir::NoDot | QDir::Hidden | QDir::AllEntries);
+  QList<QFileInfo> files = directory->entryInfoList(QDir::NoDot | QDir::Hidden | QDir::AllEntries);
 
   QList<QFileInfo>::iterator i;
   for (i = files.begin(); i != files.end(); i++) {
@@ -73,7 +83,7 @@ void FileManagerPlugin::sendListing(const QString& path) {
     QString group       = f.group();
     QString lastmod     = f.lastModified().toString(QStringLiteral("MMM dd hh:mm"));
     qint64 bytesize     = f.size();
-    bool readable       = f.isReadable(); 
+    bool readable       = f.isReadable();
 
     file->insert(QStringLiteral("filename"), filename);
     file->insert(QStringLiteral("permissions"), permissions);
@@ -97,10 +107,25 @@ void FileManagerPlugin::sendListing(const QString& path) {
 
   sendPacket(netpacket);
 
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "constructed JSON=" << listingJSON;
+  // qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "constructed JSON=" << listingJSON;
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "sent JSON packet for " << path;
 
 }
+
+
+void FileManagerPlugin::sendFile(const QString& path) {
+  QUrl url = QUrl::fromLocalFile(path);
+  QDBusMessage msg = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kdeconnect"),
+                      QStringLiteral("/modules/kdeconnect/devices/") + device()->id() + QStringLiteral("/share"),
+                      QStringLiteral("org.kde.kdeconnect.device.share"), QStringLiteral("shareUrl"));
+
+  msg.setArguments(QVariantList() << QVariant(url.toString()));
+
+  qDebug() << "boutta call dbus share method on" << url.toString();
+  blockOnReply(DBusHelper::sessionBus().asyncCall(msg));
+
+}
+
 
 QString FileManagerPlugin::permissionsString(QFileDevice::Permissions permissions) {
   // first three are rwx for owner, then group, then any user

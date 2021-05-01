@@ -44,12 +44,20 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
       sendListing();
   }
 
-  else if (np.get<bool>(QStringLiteral("requestDownload"), false)) {
-    if (np.has(QStringLiteral("filepath"))) {
-      QString filepath = np.get<QString>(QStringLiteral("filepath"));
+  else if (np.has(QStringLiteral("path"))) {
+    QString filepath = np.get<QString>(QStringLiteral("path"));
+    qDebug() << "got a possible download request for" << filepath;
+    if (np.has(QStringLiteral("requestFileDownload")) && np.get<bool>(QStringLiteral("requestFileDownload"))) {
       sendFile(filepath);
     }
+
+    else if (np.has(QStringLiteral("requestDirectoryDownload")) && np.get<bool>(QStringLiteral("requestDirectoryDownload"))) {
+      qDebug() << "got a request for directory download" << filepath;
+      // QString zippedPath = zipDirectory(filepath);
+      // sendFile(zippedPath);
+    }
   }
+
   return true;
 }
 
@@ -103,7 +111,9 @@ void FileManagerPlugin::sendListing(const QString& path) {
 
   NetworkPacket netpacket(PACKET_TYPE_FILEMANAGER);
   netpacket.set<QString>(QStringLiteral("directoryListing"), listingJSON);
-  netpacket.set<QString>(QStringLiteral("directoryPath"), path);
+  QString temp = directory->cleanPath(directory->absolutePath());
+  netpacket.set<QString>(QStringLiteral("directoryPath"), temp);
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "directoryPath=" << temp;
 
   sendPacket(netpacket);
 

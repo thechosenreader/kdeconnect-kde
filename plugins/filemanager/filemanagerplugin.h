@@ -36,8 +36,8 @@ public:
 
 private:
     QDir* directory = new QDir(QDir::homePath());
-    
-    void sendListing(){ sendListing(QDir::homePath()); }
+
+    void sendListing(){ sendListing(directory->cleanPath(directory->absolutePath())); }
     void sendListing(const QString& path);
     QString permissionsString(QFileDevice::Permissions permissions);
     void sendFile(const QString& path);

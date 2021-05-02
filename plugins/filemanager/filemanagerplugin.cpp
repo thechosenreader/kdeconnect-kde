@@ -20,6 +20,7 @@ FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
     : KdeConnectPlugin(parent, args)
 {
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "FILEMANAGER plugin constructor for device" << device()->name();
+     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "testing random string" << genRandomString();
 }
 
 
@@ -53,8 +54,7 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
 
     else if (np.has(QStringLiteral("requestDirectoryDownload")) && np.get<bool>(QStringLiteral("requestDirectoryDownload"))) {
       qDebug() << "got a request for directory download" << filepath;
-      // QString zippedPath = zipDirectory(filepath);
-      // sendFile(zippedPath);
+      sendArchive(filepath);
     }
   }
 
@@ -157,5 +157,154 @@ QString FileManagerPlugin::permissionsString(QFileDevice::Permissions permission
 
   return permstring;
 }
+
+
+QList<QString> FileManagerPlugin::recurseAddDir(const QDir& dir) {
+  QList<QString> sourceList;
+  QList<QString> entryList = dir.entryList(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files);
+
+  for (QList<QString>::iterator i = entryList.begin(); i != entryList.end(); i++) {
+    QString entry  = *i;
+
+    // qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "found entry" << entry;
+    QFileInfo finfo(QString(QStringLiteral("%1/%2")).arg(dir.path()).arg(entry));
+    // qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "made finfo for" << finfo.filePath();
+
+    if (finfo.isSymLink()) {
+      continue;
+    }
+
+    if (finfo.isDir()) {
+      QDir sd(finfo.filePath());
+      sourceList += recurseAddDir(sd);
+    } else {
+      // qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "adding to sourceList" << QDir::toNativeSeparators(finfo.filePath());
+      sourceList << QDir::toNativeSeparators(finfo.filePath());
+    }
+  }
+
+  return sourceList;
+}
+
+bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir, const QString& comment) {
+  // initializing archive
+  QuaZip zip(outPath);
+  zip.setFileNameCodec("IBM866");
+
+  // basic error checking, confirming permissions and that dir exists
+  if (!zip.open(QuaZip::mdCreate)) {
+      qDebug() << QString(QStringLiteral("testCreate(): zip.open(): %1")).arg(zip.getZipError());
+      return false;
+  }
+
+  if (!dir.exists()) {
+      qDebug() << QString(QStringLiteral("dir.exists(%1)=FALSE")).arg(dir.absolutePath());
+      return false;
+  }
+
+
+  QList<QString> sourceList = recurseAddDir(dir);
+
+  QList<QFileInfo> files;
+  for (QList<QString>::iterator i = sourceList.begin(); i != sourceList.end(); i++){
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "adding file" << *i << "to list";
+    files << QFileInfo(*i);
+  }
+
+  QuaZipFile outFile(&zip);
+
+  QFile inFile;
+
+  char c;
+  for (QList<QFileInfo>::iterator i = files.begin(); i != files.end(); i++) {
+      QFileInfo fileinfo = *i;
+
+      if (!fileinfo.isFile())
+          continue;
+
+      QString fileNameWithRelativePath = fileinfo.filePath().remove(0, dir.absolutePath().length() + 1);
+
+      inFile.setFileName(fileinfo.filePath());
+
+      if (!inFile.open(QIODevice::ReadOnly)) {
+          qDebug() << QString(QStringLiteral("testCreate(): inFile.open(): ")) << inFile.errorString().toLocal8Bit().constData();
+          return false;
+      }
+
+      if (!outFile.open(QIODevice::WriteOnly, QuaZipNewInfo(fileNameWithRelativePath, fileinfo.filePath()))) {
+          qDebug() << QString(QStringLiteral("testCreate(): outFile.open(): %1")).arg(outFile.getZipError());
+          return false;
+      }
+
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "zipping" << fileinfo.filePath();
+      while (inFile.getChar(&c) && outFile.putChar(c));
+
+      if (outFile.getZipError() != UNZ_OK) {
+          qDebug() << QString(QStringLiteral("testCreate(): outFile.putChar(): %1")).arg(outFile.getZipError());
+          return false;
+      }
+
+      outFile.close();
+
+      if (outFile.getZipError() != UNZ_OK) {
+          qDebug() << QString(QStringLiteral("testCreate(): outFile.close(): %1")).arg(outFile.getZipError());
+          return false;
+      }
+
+      inFile.close();
+  }
+
+  // add comment if needed
+  if (!comment.isEmpty())
+      zip.setComment(comment);
+
+  zip.close();
+
+  if (zip.getZipError() != 0) {
+      qDebug() << QString(QStringLiteral("testCreate(): zip.close(): %1")).arg(zip.getZipError());
+      return false;
+  }
+
+  return true;
+}
+
+QString FileManagerPlugin::genRandomString(const qint16 maxLength) {
+  QString out;
+
+  for (qint16 i = 0; i < maxLength; i++) {
+    qint16 randIndex = random->generate() % possibleChars.length();
+    out.append(possibleChars.at(randIndex));
+  }
+
+  return out;
+}
+
+void FileManagerPlugin::sendArchive(const QString& directoryPath) {
+    if (zippedFiles.contains(directoryPath)) {
+      QString zipLocation = zippedFiles.value(directoryPath);
+      if (QFile::exists(zipLocation)) {
+        sendFile(zipLocation);
+        return;
+      } else {
+        zippedFiles.remove(directoryPath);
+      }
+    }
+
+    QString newLocation = QString(QStringLiteral("%1/%2%3")).arg(QDir::tempPath()).arg(genRandomString()).arg(QStringLiteral(".zip"));
+    zippedFiles.insert(directoryPath, newLocation);
+    if(_archive(newLocation, QDir(directoryPath))) {
+      sendFile(newLocation);
+    }
+    else {
+      sendErrorPacket(QStringLiteral("Could not create archive!"));
+    }
+}
+
+void FileManagerPlugin::sendErrorPacket(const QString& errorMsg) {
+  NetworkPacket np(PACKET_TYPE_FILEMANAGER);
+  np.set<QString>(QStringLiteral("Error"), errorMsg);
+  sendPacket(np);
+}
+
 
 #include "filemanagerplugin.moc"

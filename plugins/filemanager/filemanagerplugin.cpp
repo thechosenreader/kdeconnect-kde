@@ -21,6 +21,7 @@ FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
 {
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "FILEMANAGER plugin constructor for device" << device()->name();
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "testing random string" << genRandomString();
+
 }
 
 
@@ -54,7 +55,7 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
 
     else if (np.has(QStringLiteral("requestDirectoryDownload")) && np.get<bool>(QStringLiteral("requestDirectoryDownload"))) {
       qDebug() << "got a request for directory download" << filepath;
-      sendArchive(filepath);
+      QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::sendArchive, filepath);
     }
   }
 
@@ -161,7 +162,7 @@ QString FileManagerPlugin::permissionsString(QFileDevice::Permissions permission
 
 QList<QString> FileManagerPlugin::recurseAddDir(const QDir& dir) {
   QList<QString> sourceList;
-  QList<QString> entryList = dir.entryList(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files);
+  QList<QString> entryList = dir.entryList(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files | QDir::Hidden);
 
   for (QList<QString>::iterator i = entryList.begin(); i != entryList.end(); i++) {
     QString entry  = *i;
@@ -207,7 +208,7 @@ bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir, const 
 
   QList<QFileInfo> files;
   for (QList<QString>::iterator i = sourceList.begin(); i != sourceList.end(); i++){
-    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "adding file" << *i << "to list";
+    // qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "adding file" << *i << "to list";
     files << QFileInfo(*i);
   }
 
@@ -236,7 +237,7 @@ bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir, const 
           return false;
       }
 
-      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "zipping" << fileinfo.filePath();
+      // qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "zipping" << fileinfo.filePath();
       while (inFile.getChar(&c) && outFile.putChar(c));
 
       if (outFile.getZipError() != UNZ_OK) {
@@ -280,22 +281,29 @@ QString FileManagerPlugin::genRandomString(const qint16 maxLength) {
 }
 
 void FileManagerPlugin::sendArchive(const QString& directoryPath) {
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "archiving" << directoryPath;
     if (zippedFiles.contains(directoryPath)) {
       QString zipLocation = zippedFiles.value(directoryPath);
       if (QFile::exists(zipLocation)) {
         sendFile(zipLocation);
+        qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "archive already exists, sending" << zipLocation;
         return;
       } else {
         zippedFiles.remove(directoryPath);
       }
     }
 
-    QString newLocation = QString(QStringLiteral("%1/%2%3")).arg(QDir::tempPath()).arg(genRandomString()).arg(QStringLiteral(".zip"));
+    QDir targetDir(directoryPath);
+    QString newLocation = QString(QStringLiteral("%1/%2_%3%4")).arg(QDir::tempPath()).arg(targetDir.dirName()).arg(genRandomString()).arg(QStringLiteral(".zip"));
     zippedFiles.insert(directoryPath, newLocation);
-    if(_archive(newLocation, QDir(directoryPath))) {
+
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "creating new archive at" << newLocation;
+    if(_archive(newLocation, targetDir)) {
       sendFile(newLocation);
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "sent newly created archive";
     }
     else {
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "could not create archive";
       sendErrorPacket(QStringLiteral("Could not create archive!"));
     }
 }

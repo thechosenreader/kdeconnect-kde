@@ -34,13 +34,13 @@ public:
     bool receivePacket(const NetworkPacket& np) override;
     void connected() override;
 
-    static QProcess* commandProcess(const QString& cmd);
 
 private Q_SLOTS:
     void configChanged();
 
 private:
     void sendConfig();
+    QProcess* commandProcess(const QString& cmd);
 
 };
 

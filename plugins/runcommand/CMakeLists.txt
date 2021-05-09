@@ -11,6 +11,7 @@ set(kdeconnect_runcommand_SRCS
 )
 
 kdeconnect_add_plugin(kdeconnect_runcommand JSON kdeconnect_runcommand.json SOURCES ${kdeconnect_runcommand_SRCS})
+# add_library(kdeconnect_runcommand ${kdeconnect_runcommand_SRCS})
 
 target_link_libraries(kdeconnect_runcommand
     kdeconnectcore

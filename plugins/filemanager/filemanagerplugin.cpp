@@ -50,27 +50,45 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
 
   else if (np.has(QStringLiteral("path"))) {
     QString filepath = np.get<QString>(QStringLiteral("path"));
-    qDebug() << "got a possible download request for" << filepath;
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "got a possible download request for" << filepath;
     if (np.has(QStringLiteral("requestFileDownload")) && np.get<bool>(QStringLiteral("requestFileDownload"))) {
       sendFile(filepath);
     }
 
     else if (np.has(QStringLiteral("requestDirectoryDownload")) && np.get<bool>(QStringLiteral("requestDirectoryDownload"))) {
-      qDebug() << "got a request for directory download" << filepath;
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "got a request for directory download" << filepath;
       QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::sendArchive, filepath);
     }
 
     else if (np.has(QStringLiteral("requestDelete")) && np.get<bool>(QStringLiteral("requestDelete"))) {
-      qDebug() << "got delete request for" << filepath;
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "got delete request for" << filepath;
       QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::deleteFile, filepath);
     }
 
     else if (np.has(QStringLiteral("requestRename")) && np.get<bool>(QStringLiteral("requestRename"))) {
-      qDebug() << "got rename request for" << filepath;
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "got rename request for" << filepath;
       if (np.has(QStringLiteral("newname"))) {
         QString newname = np.get<QString>(QStringLiteral("newname"));
         rename(filepath, newname);
       }
+    }
+  }
+
+  else if (np.has(QStringLiteral("requestMakeDirectory")) && np.get<bool>(QStringLiteral("requestMakeDirectory"))) {
+    if (np.has(QStringLiteral("dirname"))) {
+      QString dirname = np.get<QString>(QStringLiteral("dirname"));
+      QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::makeDirectory, dirname);
+    }
+  }
+
+  else if (np.has(QStringLiteral("requestRunCommand")) && np.get<bool>(QStringLiteral("requestRunCommand"))) {
+    if (np.has(QStringLiteral("command"))) {
+      QString cmd = np.get<QString>(QStringLiteral("command"));
+      QString wd;
+      if (np.has(QStringLiteral("wd"))) {
+        wd = np.get<QString>(QStringLiteral("wd"));
+      } else { wd = directory->absolutePath(); }
+      QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::runCommand, cmd, wd);
     }
   }
 
@@ -90,17 +108,17 @@ void FileManagerPlugin::sendListing(const QString& path) {
   if (finfo.isDir()) {
     directory->cd(path);
   } else {
-    qDebug() << "path is actually file with abspath" << finfo.absoluteFilePath();
-    qDebug() << "about to cd into" << finfo.absoluteDir().absolutePath();
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "path is actually file with abspath" << finfo.absoluteFilePath();
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "about to cd into" << finfo.absoluteDir().absolutePath();
     directory->cd(finfo.absoluteDir().absolutePath());
     if (finfo.exists()) {
-      qDebug() << "sending file" << path;
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "sending file" << path;
       sendFile(finfo.absoluteFilePath());
     }
   }
 
   directory->setPath(directory->absolutePath());
-  qDebug() << "cwd is" << directory->absolutePath();
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "cwd is" << directory->absolutePath();
 
   QList<QFileInfo> files = directory->entryInfoList(QDir::NoDot | QDir::Hidden | QDir::AllEntries);
 
@@ -159,7 +177,7 @@ void FileManagerPlugin::sendFile(const QString& path) {
 
   msg.setArguments(QVariantList() << QVariant(url.toString()));
 
-  qDebug() << "boutta call dbus share method on" << url.toString();
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "boutta call dbus share method on" << url.toString();
   blockOnReply(DBusHelper::sessionBus().asyncCall(msg));
 
 }
@@ -221,12 +239,12 @@ bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir) {
 
   // basic error checking, confirming permissions and that dir exists
   if (!zip.open(QuaZip::mdCreate)) {
-      qDebug() << QString(QStringLiteral("testCreate(): zip.open(): %1")).arg(zip.getZipError());
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << QString(QStringLiteral("testCreate(): zip.open(): %1")).arg(zip.getZipError());
       return false;
   }
 
   if (!dir.exists()) {
-      qDebug() << QString(QStringLiteral("dir.exists(%1)=FALSE")).arg(dir.absolutePath());
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << QString(QStringLiteral("dir.exists(%1)=FALSE")).arg(dir.absolutePath());
       return false;
   }
 
@@ -255,12 +273,12 @@ bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir) {
       inFile.setFileName(fileinfo.filePath());
 
       if (!inFile.open(QIODevice::ReadOnly)) {
-          qDebug() << QString(QStringLiteral("testCreate(): inFile.open(): ")) << inFile.errorString().toLocal8Bit().constData();
+          qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << QString(QStringLiteral("testCreate(): inFile.open(): ")) << inFile.errorString().toLocal8Bit().constData();
           return false;
       }
 
       if (!outFile.open(QIODevice::WriteOnly, QuaZipNewInfo(fileNameWithRelativePath, fileinfo.filePath()))) {
-          qDebug() << QString(QStringLiteral("testCreate(): outFile.open(): %1")).arg(outFile.getZipError());
+          qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << QString(QStringLiteral("testCreate(): outFile.open(): %1")).arg(outFile.getZipError());
           return false;
       }
 
@@ -268,14 +286,14 @@ bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir) {
       while (inFile.getChar(&c) && outFile.putChar(c));
 
       if (outFile.getZipError() != UNZ_OK) {
-          qDebug() << QString(QStringLiteral("testCreate(): outFile.putChar(): %1")).arg(outFile.getZipError());
+          qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << QString(QStringLiteral("testCreate(): outFile.putChar(): %1")).arg(outFile.getZipError());
           return false;
       }
 
       outFile.close();
 
       if (outFile.getZipError() != UNZ_OK) {
-          qDebug() << QString(QStringLiteral("testCreate(): outFile.close(): %1")).arg(outFile.getZipError());
+          qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << QString(QStringLiteral("testCreate(): outFile.close(): %1")).arg(outFile.getZipError());
           return false;
       }
 
@@ -285,7 +303,7 @@ bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir) {
   zip.close();
 
   if (zip.getZipError() != 0) {
-      qDebug() << QString(QStringLiteral("testCreate(): zip.close(): %1")).arg(zip.getZipError());
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << QString(QStringLiteral("testCreate(): zip.close(): %1")).arg(zip.getZipError());
       return false;
   }
 
@@ -351,11 +369,11 @@ void FileManagerPlugin::deleteFile(const QString& path) {
   bool success = _delete(path);
 
   if (success) {
-    qDebug() << "successfully deleted" << path;
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "successfully deleted" << path;
     Q_EMIT updateListing();
     return;
   } else {
-    qDebug() << "could not delete" << path;
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "could not delete" << path;
     Q_EMIT errorNeedsSending(QString(QStringLiteral("Error deleting file %1").arg(path)));
   }
 
@@ -366,10 +384,10 @@ void FileManagerPlugin::rename(const QString& path, const QString& newname) {
   bool success = directory->rename(path, newname);
 
   if (success) {
-    qDebug() << "successfully renamed" << path << "to" << newname;
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "successfully renamed" << path << "to" << newname;
     Q_EMIT updateListing();
   } else {
-    qDebug() << "failed to rename" << path << "to" << newname;
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "failed to rename" << path << "to" << newname;
     Q_EMIT errorNeedsSending(QString(QStringLiteral("Could not rename %1 to %2")).arg(path).arg(newname));
   }
 
@@ -377,7 +395,7 @@ void FileManagerPlugin::rename(const QString& path, const QString& newname) {
 
 
 void FileManagerPlugin::updateListing() {
-  qDebug() << "received signal to update listing";
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "received signal to update listing";
   sendListing();
 }
 
@@ -390,9 +408,44 @@ void FileManagerPlugin::sendError(const QString& errorMsg) {
 void FileManagerPlugin::sendErrorPacket(const QString& errorMsg) {
   NetworkPacket np(PACKET_TYPE_FILEMANAGER);
   np.set<QString>(QStringLiteral("Error"), errorMsg);
-  qDebug() << "created error packet with msg" << errorMsg;
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "created error packet with msg" << errorMsg;
   sendPacket(np);
 }
 
+
+void FileManagerPlugin::runCommand(const QString& cmd, const QString& wd) {
+  QProcess* proc = commandProcess(cmd);
+  proc->setWorkingDirectory(wd);
+  connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+      [=](int exitCode, QProcess::ExitStatus exitStatus){
+        Q_EMIT errorNeedsSending(QString(QStringLiteral("exit code %1")).arg(exitCode));
+        Q_EMIT listingNeedsUpdate();
+    });
+
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "running" << cmd << "in" << wd;
+  proc->start();
+}
+
+
+void FileManagerPlugin::runCommand(const QString& cmd) {
+  runCommand(cmd, directory->absolutePath());
+}
+
+void FileManagerPlugin::makeDirectory(const QString& path) {
+  bool success = directory->mkpath(path);
+  if (success) {
+    Q_EMIT updateListing();
+  } else {
+    Q_EMIT errorNeedsSending(QString(QStringLiteral("Could not make %1")).arg(path));
+  }
+}
+
+QProcess* FileManagerPlugin::commandProcess(const QString& cmd) {
+  qCInfo(KDECONNECT_PLUGIN_FILEMANAGER) << "Running:" << COMMAND << ARGS << cmd;
+  QProcess* proc = new QProcess();
+  proc->setProgram(QStringLiteral(COMMAND));
+  proc->setArguments(QStringList() << QStringLiteral(ARGS) << cmd);
+  return proc;
+}
 
 #include "filemanagerplugin.moc"

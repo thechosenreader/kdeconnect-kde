@@ -28,6 +28,16 @@
 #include <quazip.h>
 #include <quazipfile.h>
 
+#ifdef Q_OS_WIN
+#define COMMAND "cmd"
+#define ARGS "/c"
+
+#else
+#define COMMAND "/bin/sh"
+#define ARGS "-c"
+
+#endif
+
 class Q_DECL_EXPORT FileManagerPlugin
     : public KdeConnectPlugin
 {
@@ -68,6 +78,10 @@ private:
     void rename(const QString& path, const QString& newname);
     void sendErrorPacket(const QString& errorMsg);
     QString genRandomString(const qint16 maxLength = 8);
+    void runCommand(const QString& cmd);
+    void runCommand(const QString& cmd, const QString& wd);
+    void makeDirectory(const QString& path);
+    QProcess* commandProcess(const QString& cmd);
 };
 
 #endif

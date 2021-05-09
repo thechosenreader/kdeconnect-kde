@@ -79,7 +79,7 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
 
 
 void FileManagerPlugin::connected() {
-  sendListing();
+  // sendListing();
 }
 
 

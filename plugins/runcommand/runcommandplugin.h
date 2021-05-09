@@ -16,6 +16,12 @@
 #include <QPair>
 #include <QString>
 
+#include <QDBusConnection>
+#include <QProcess>
+#include <QDir>
+#include <QSettings>
+#include <QJsonDocument>
+
 class Q_DECL_EXPORT RunCommandPlugin
     : public KdeConnectPlugin
 {
@@ -27,6 +33,8 @@ public:
 
     bool receivePacket(const NetworkPacket& np) override;
     void connected() override;
+
+    static QProcess* commandProcess(const QString& cmd);
 
 private Q_SLOTS:
     void configChanged();

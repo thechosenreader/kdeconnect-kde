@@ -8,12 +8,6 @@
 
 #include <KPluginFactory>
 
-#include <QDBusConnection>
-#include <QProcess>
-#include <QDir>
-#include <QSettings>
-#include <QJsonDocument>
-
 #ifdef SAILFISHOS
 #define KCMUTILS_VERSION 0
 #else
@@ -76,14 +70,12 @@ bool RunCommandPlugin::receivePacket(const NetworkPacket& np)
 
 	else if (np.has(QStringLiteral("rawCommand"))) {
 		QString rawCommand = np.get<QString>(QStringLiteral("rawCommand"));
-        	qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Running:" << COMMAND << ARGS << rawCommand;
-		QProcess::startDetached(QStringLiteral(COMMAND), QStringList() << QStringLiteral(ARGS) << rawCommand);
+    commandProcess(rawCommand)->startDetached();
 	}
 
 	else {
 		const QJsonObject commandJson = value.toObject();
-		qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Running:" << COMMAND << ARGS << commandJson[QStringLiteral("command")].toString();
-		QProcess::startDetached(QStringLiteral(COMMAND), QStringList()<< QStringLiteral(ARGS) << commandJson[QStringLiteral("command")].toString());
+    commandProcess(commandJson[QStringLiteral("command")].toString())->startDetached();
 		return true;
 	     }
     } else if (np.has(QStringLiteral("setup"))) {
@@ -114,6 +106,14 @@ void RunCommandPlugin::sendConfig()
 
 void RunCommandPlugin::configChanged() {
     sendConfig();
+}
+
+QProcess* RunCommandPlugin::commandProcess(const QString& cmd) {
+  qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Running:" << COMMAND << ARGS << cmd;
+  QProcess* proc = new QProcess();
+  proc->setProgram(QStringLiteral(COMMAND));
+  proc->setArguments(QStringList() << QStringLiteral(ARGS) << cmd);
+  return proc;
 }
 
 #include "runcommandplugin.moc"

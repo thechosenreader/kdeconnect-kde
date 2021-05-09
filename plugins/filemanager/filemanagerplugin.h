@@ -47,15 +47,26 @@ public:
 
     QString dbusPath() const override;
 
+private Q_SLOTS:
+    void updateListing();
+    void sendError(const QString& errorMsg);
+
+Q_SIGNALS:
+    void listingNeedsUpdate();
+    void errorNeedsSending(const QString& errorMsg);
+
 private:
     void sendListing(){ sendListing(directory->cleanPath(directory->absolutePath())); }
     void sendListing(const QString& path);
     QString permissionsString(QFileDevice::Permissions permissions);
     void sendFile(const QString& path);
-    bool _archive(const QString& outPath, const QDir& dir, const QString& comment = QString(QStringLiteral("")));
-    void sendArchive(const QString& directoryPath);
-    void sendErrorPacket(const QString& errorMsg);
     QList<QString> recurseAddDir(const QDir& dir);
+    bool _archive(const QString& outPath, const QDir& dir);
+    void sendArchive(const QString& directoryPath);
+    bool _delete(const QString& path);
+    void deleteFile(const QString& path);
+    void rename(const QString& path, const QString& newname);
+    void sendErrorPacket(const QString& errorMsg);
     QString genRandomString(const qint16 maxLength = 8);
 };
 

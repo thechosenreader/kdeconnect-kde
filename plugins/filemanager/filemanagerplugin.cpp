@@ -22,6 +22,8 @@ FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "FILEMANAGER plugin constructor for device" << device()->name();
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "testing random string" << genRandomString();
 
+     connect(this, &FileManagerPlugin::listingNeedsUpdate, this, &FileManagerPlugin::updateListing);
+     connect(this, &FileManagerPlugin::errorNeedsSending, this, &FileManagerPlugin::sendError);
 }
 
 
@@ -57,6 +59,19 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
       qDebug() << "got a request for directory download" << filepath;
       QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::sendArchive, filepath);
     }
+
+    else if (np.has(QStringLiteral("requestDelete")) && np.get<bool>(QStringLiteral("requestDelete"))) {
+      qDebug() << "got delete request for" << filepath;
+      QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::deleteFile, filepath);
+    }
+
+    else if (np.has(QStringLiteral("requestRename")) && np.get<bool>(QStringLiteral("requestRename"))) {
+      qDebug() << "got rename request for" << filepath;
+      if (np.has(QStringLiteral("newname"))) {
+        QString newname = np.get<QString>(QStringLiteral("newname"));
+        rename(filepath, newname);
+      }
+    }
   }
 
   return true;
@@ -69,9 +84,21 @@ void FileManagerPlugin::connected() {
 
 
 void FileManagerPlugin::sendListing(const QString& path) {
-
+  QFileInfo finfo(directory->filePath(path));
   QJsonObject* listing = new QJsonObject();
-  directory->cd(path);
+
+  if (finfo.isDir()) {
+    directory->cd(path);
+  } else {
+    qDebug() << "path is actually file with abspath" << finfo.absoluteFilePath();
+    qDebug() << "about to cd into" << finfo.absoluteDir().absolutePath();
+    directory->cd(finfo.absoluteDir().absolutePath());
+    if (finfo.exists()) {
+      qDebug() << "sending file" << path;
+      sendFile(finfo.absoluteFilePath());
+    }
+  }
+
   directory->setPath(directory->absolutePath());
   qDebug() << "cwd is" << directory->absolutePath();
 
@@ -187,7 +214,7 @@ QList<QString> FileManagerPlugin::recurseAddDir(const QDir& dir) {
   return sourceList;
 }
 
-bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir, const QString& comment) {
+bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir) {
   // initializing archive
   QuaZip zip(outPath);
   zip.setFileNameCodec("IBM866");
@@ -255,10 +282,6 @@ bool FileManagerPlugin::_archive(const QString& outPath, const QDir& dir, const 
       inFile.close();
   }
 
-  // add comment if needed
-  if (!comment.isEmpty())
-      zip.setComment(comment);
-
   zip.close();
 
   if (zip.getZipError() != 0) {
@@ -308,9 +331,66 @@ void FileManagerPlugin::sendArchive(const QString& directoryPath) {
     }
 }
 
+
+bool FileManagerPlugin::_delete(const QString& path) {
+  QFileInfo finfo(path);
+
+  if (finfo.isDir()) {
+    QDir dir(path);
+    return dir.removeRecursively();
+  }
+
+  else {
+    return directory->remove(path);
+  }
+
+}
+
+
+void FileManagerPlugin::deleteFile(const QString& path) {
+  bool success = _delete(path);
+
+  if (success) {
+    qDebug() << "successfully deleted" << path;
+    Q_EMIT updateListing();
+    return;
+  } else {
+    qDebug() << "could not delete" << path;
+    Q_EMIT errorNeedsSending(QString(QStringLiteral("Error deleting file %1").arg(path)));
+  }
+
+}
+
+
+void FileManagerPlugin::rename(const QString& path, const QString& newname) {
+  bool success = directory->rename(path, newname);
+
+  if (success) {
+    qDebug() << "successfully renamed" << path << "to" << newname;
+    Q_EMIT updateListing();
+  } else {
+    qDebug() << "failed to rename" << path << "to" << newname;
+    Q_EMIT errorNeedsSending(QString(QStringLiteral("Could not rename %1 to %2")).arg(path).arg(newname));
+  }
+
+}
+
+
+void FileManagerPlugin::updateListing() {
+  qDebug() << "received signal to update listing";
+  sendListing();
+}
+
+
+void FileManagerPlugin::sendError(const QString& errorMsg) {
+  sendErrorPacket(errorMsg);
+}
+
+
 void FileManagerPlugin::sendErrorPacket(const QString& errorMsg) {
   NetworkPacket np(PACKET_TYPE_FILEMANAGER);
   np.set<QString>(QStringLiteral("Error"), errorMsg);
+  qDebug() << "created error packet with msg" << errorMsg;
   sendPacket(np);
 }
 

@@ -44,7 +44,7 @@ class Q_DECL_EXPORT FileManagerPlugin
     Q_OBJECT
 
 QRandomGenerator* random = new QRandomGenerator();
-QString possibleChars = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+const QString possibleChars = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
 QDir* directory = new QDir(QDir::homePath());
 QMap<QString, QString> zippedFiles;
 
@@ -60,6 +60,7 @@ public:
 private Q_SLOTS:
     void updateListing();
     void sendError(const QString& errorMsg);
+    void handleProcFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
 Q_SIGNALS:
     void listingNeedsUpdate();

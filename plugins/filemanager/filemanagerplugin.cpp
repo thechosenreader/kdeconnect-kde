@@ -88,6 +88,7 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
       if (np.has(QStringLiteral("wd"))) {
         wd = np.get<QString>(QStringLiteral("wd"));
       } else { wd = directory->absolutePath(); }
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "starting thread to run" << cmd << "in" << wd;
       QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::runCommand, cmd, wd);
     }
   }
@@ -416,14 +417,12 @@ void FileManagerPlugin::sendErrorPacket(const QString& errorMsg) {
 void FileManagerPlugin::runCommand(const QString& cmd, const QString& wd) {
   QProcess* proc = commandProcess(cmd);
   proc->setWorkingDirectory(wd);
-  connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
-      [=](int exitCode, QProcess::ExitStatus exitStatus){
-        Q_EMIT errorNeedsSending(QString(QStringLiteral("exit code %1")).arg(exitCode));
-        Q_EMIT listingNeedsUpdate();
-    });
-
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "about to connect processs";
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "running" << cmd << "in" << wd;
   proc->start();
+  proc->waitForFinished(-1);
+  Q_EMIT errorNeedsSending(QString(QStringLiteral("exit code %1")).arg(proc->exitCode()));
+  Q_EMIT listingNeedsUpdate();
 }
 
 
@@ -446,6 +445,12 @@ QProcess* FileManagerPlugin::commandProcess(const QString& cmd) {
   proc->setProgram(QStringLiteral(COMMAND));
   proc->setArguments(QStringList() << QStringLiteral(ARGS) << cmd);
   return proc;
+}
+
+void FileManagerPlugin::handleProcFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "handleProcFinished slot was called";
+  Q_EMIT errorNeedsSending(QString(QStringLiteral("exit code %1")).arg(exitCode));
+  Q_EMIT listingNeedsUpdate();
 }
 
 #include "filemanagerplugin.moc"

@@ -62,7 +62,6 @@ public:
 private Q_SLOTS:
     void updateListing();
     void sendError(const QString& errorMsg);
-    void handleProcFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
 Q_SIGNALS:
     void listingNeedsUpdate();

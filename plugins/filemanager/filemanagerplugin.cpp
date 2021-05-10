@@ -20,7 +20,6 @@ FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
     : KdeConnectPlugin(parent, args)
 {
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "FILEMANAGER plugin constructor for device" << device()->name();
-     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "testing random string" << genRandomString();
 
      connect(this, &FileManagerPlugin::listingNeedsUpdate, this, &FileManagerPlugin::updateListing);
      connect(this, &FileManagerPlugin::errorNeedsSending, this, &FileManagerPlugin::sendError);
@@ -116,8 +115,6 @@ void FileManagerPlugin::sendListing(const QString& path) {
   if (finfo.isDir()) {
     directory->cd(path);
   } else {
-    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "path is actually file with abspath" << finfo.absoluteFilePath();
-    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "about to cd into" << finfo.absoluteDir().absolutePath();
     directory->cd(finfo.absoluteDir().absolutePath());
     if (finfo.exists()) {
       qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "sending file" << path;
@@ -167,7 +164,6 @@ void FileManagerPlugin::sendListing(const QString& path) {
   netpacket.set<QString>(QStringLiteral("directoryListing"), listingJSON);
   QString temp = directory->cleanPath(directory->absolutePath());
   netpacket.set<QString>(QStringLiteral("directoryPath"), temp);
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "directoryPath=" << temp;
 
   sendPacket(netpacket);
 
@@ -185,7 +181,6 @@ void FileManagerPlugin::sendFile(const QString& path) {
 
   msg.setArguments(QVariantList() << QVariant(url.toString()));
 
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "boutta call dbus share method on" << url.toString();
   blockOnReply(DBusHelper::sessionBus().asyncCall(msg));
 
 }
@@ -413,7 +408,6 @@ void FileManagerPlugin::rename(const QString& path, const QString& newname) {
 
 
 void FileManagerPlugin::updateListing() {
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "received signal to update listing";
   sendListing();
 }
 
@@ -434,8 +428,6 @@ void FileManagerPlugin::sendErrorPacket(const QString& errorMsg) {
 void FileManagerPlugin::runCommand(const QString& cmd, const QString& wd) {
   QProcess* proc = commandProcess(cmd);
   proc->setWorkingDirectory(wd);
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "about to connect processs";
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "running" << cmd << "in" << wd;
   proc->start();
   proc->waitForFinished(-1);
   Q_EMIT errorNeedsSending(QString(QStringLiteral("exit code %1")).arg(proc->exitCode()));
@@ -462,12 +454,6 @@ QProcess* FileManagerPlugin::commandProcess(const QString& cmd) {
   proc->setProgram(QStringLiteral(COMMAND));
   proc->setArguments(QStringList() << QStringLiteral(ARGS) << cmd);
   return proc;
-}
-
-void FileManagerPlugin::handleProcFinished(int exitCode, QProcess::ExitStatus exitStatus) {
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "handleProcFinished slot was called";
-  Q_EMIT errorNeedsSending(QString(QStringLiteral("exit code %1")).arg(exitCode));
-  Q_EMIT listingNeedsUpdate();
 }
 
 #include "filemanagerplugin.moc"

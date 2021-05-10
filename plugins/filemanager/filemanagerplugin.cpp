@@ -44,13 +44,15 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
     if (np.has(QStringLiteral("directoryPath")))
       sendListing(np.get<QString>(QStringLiteral("directoryPath")));
 
+    else if (np.has(QStringLiteral("home")) && np.get<bool>(QStringLiteral("home")))
+      sendListing(QDir::homePath());
+
     else
       sendListing();
   }
 
   else if (np.has(QStringLiteral("path"))) {
     QString filepath = np.get<QString>(QStringLiteral("path"));
-    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "got a possible download request for" << filepath;
     if (np.has(QStringLiteral("requestFileDownload")) && np.get<bool>(QStringLiteral("requestFileDownload"))) {
       sendFile(filepath);
     }
@@ -382,13 +384,23 @@ void FileManagerPlugin::deleteFile(const QString& path) {
 
 
 void FileManagerPlugin::rename(const QString& path, const QString& newname) {
-  bool success = directory->rename(path, newname);
+  QFileInfo current(directory->absoluteFilePath(path));
+  QFileInfo target(directory->absoluteFilePath(newname));
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "current" << current.fileName();
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "target" << target.absoluteFilePath();
+  QString targetName;
+  if (target.exists() && target.isDir()) {
+    // by default, rename fails whenever target exists
+    // this way, we can mimic the behaviour of mv: mv file dir -> dir/file
+    targetName = QString(QStringLiteral("%1/%2")).arg(target.absoluteFilePath()).arg(current.fileName());
+  } else { targetName = newname; }
+  bool success = directory->rename(path, targetName);
 
   if (success) {
-    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "successfully renamed" << path << "to" << newname;
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "successfully renamed" << path << "to" << targetName;
     Q_EMIT updateListing();
   } else {
-    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "failed to rename" << path << "to" << newname;
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "failed to rename" << path << "to" << targetName;
     Q_EMIT errorNeedsSending(QString(QStringLiteral("Could not rename %1 to %2")).arg(path).arg(newname));
   }
 

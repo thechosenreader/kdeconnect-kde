@@ -24,6 +24,7 @@
 #include <QRandomGenerator>
 #include <QFuture>
 #include <QtConcurrent>
+#include <QFlags>
 
 #include <quazip.h>
 #include <quazipfile.h>
@@ -43,6 +44,7 @@ class Q_DECL_EXPORT FileManagerPlugin
 {
     Q_OBJECT
 
+bool showHidden = false;
 QRandomGenerator* random = new QRandomGenerator();
 const QString possibleChars = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
 QDir* directory = new QDir(QDir::homePath());

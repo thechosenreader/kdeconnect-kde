@@ -95,6 +95,11 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
     }
   }
 
+  else if (np.has(QStringLiteral("togglehidden")) && np.get<bool>(QStringLiteral("togglehidden"))) {
+    showHidden = !showHidden;
+    sendListing();
+  }
+
   return true;
 }
 
@@ -123,7 +128,7 @@ void FileManagerPlugin::sendListing(const QString& path) {
   directory->setPath(directory->absolutePath());
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "cwd is" << directory->absolutePath();
 
-  QList<QFileInfo> files = directory->entryInfoList(QDir::NoDot | QDir::Hidden | QDir::AllEntries);
+  QList<QFileInfo> files = directory->entryInfoList(QDir::NoDot | QDir::AllEntries | (showHidden ? QDir::Hidden : QFlags<QDir::Filter>(0x0)));
 
   QList<QFileInfo>::iterator i;
   for (i = files.begin(); i != files.end(); i++) {

@@ -1,6 +1,8 @@
 # Hi, there!
 This and its corresponding repository for the android application are my forks of KDE Connect. I've incorporated certain features for personal use like running commands with arguments, etc. This is not the place for stability or reliability; these programs are guaranteed to work only in my environment. The official readme is below (except the official link to the android repository has been replaced with my forked version).
 
+# Changes
+Please visit the [companion repository for the android app](https://github.com/thechosenreader/kdeconnect-android) to get an overview of the changes. 
 # KDE Connect - desktop app
 
 KDE Connect is a multi-platform app that allows your devices to communicate (eg: your phone and your computer).

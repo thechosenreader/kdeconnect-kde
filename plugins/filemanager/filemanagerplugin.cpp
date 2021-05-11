@@ -73,6 +73,15 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
         rename(filepath, newname);
       }
     }
+
+    else if (np.has(QStringLiteral("requestDownloadForViewing")) && np.get<bool>(QStringLiteral("requestDownloadForViewing"))) {
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "got viewing download request for" << filepath;
+      QString dest;
+      if (np.has(QStringLiteral("dest"))) {
+        dest = np.get<QString>(QStringLiteral("dest"));
+      } else { sendErrorPacket(QStringLiteral("failed; no dest received")); return true; }
+      shareFileForViewing(filepath, dest);
+    }
   }
 
   else if (np.has(QStringLiteral("requestMakeDirectory")) && np.get<bool>(QStringLiteral("requestMakeDirectory"))) {
@@ -454,6 +463,24 @@ QProcess* FileManagerPlugin::commandProcess(const QString& cmd) {
   proc->setProgram(QStringLiteral(COMMAND));
   proc->setArguments(QStringList() << QStringLiteral(ARGS) << cmd);
   return proc;
+}
+
+
+void FileManagerPlugin::shareFileForViewing(const QString& path, const QString& dest)
+{
+    NetworkPacket packet(PACKET_TYPE_FILEMANAGER);
+    QSharedPointer<QFile> ioFile(new QFile(path));
+
+    if (!ioFile->exists()) {
+        Daemon::instance()->reportError(i18n("Could not share file"), i18n("%1 does not exist", path));
+        return;
+    } else {
+        packet.setPayload(ioFile, ioFile->size());
+        packet.set<QString>(QStringLiteral("filename"), dest);
+        packet.set<bool>(QStringLiteral("open"), false);
+    }
+
+    sendPacket(packet);
 }
 
 #include "filemanagerplugin.moc"

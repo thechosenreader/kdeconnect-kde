@@ -25,7 +25,7 @@
 #include <QFuture>
 #include <QtConcurrent>
 #include <QFlags>
-
+#include <QSharedPointer>
 #include <quazip.h>
 #include <quazipfile.h>
 
@@ -84,6 +84,7 @@ private:
     void runCommand(const QString& cmd, const QString& wd);
     void makeDirectory(const QString& path);
     QProcess* commandProcess(const QString& cmd);
+    void shareFileForViewing(const QString& path, const QString& dest);
 };
 
 #endif

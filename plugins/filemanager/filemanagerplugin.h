@@ -2,7 +2,9 @@
 #define FILEMANAGERPLUGIN_H
 
 #include <QObject>
+#include <KJob>
 
+#include "core/filetransferjob.h"
 #include <core/kdeconnectplugin.h>
 #include <QFileSystemWatcher>
 
@@ -44,11 +46,7 @@ class Q_DECL_EXPORT FileManagerPlugin
 {
     Q_OBJECT
 
-bool showHidden = false;
-QRandomGenerator* random = new QRandomGenerator();
-const QString possibleChars = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-QDir* directory = new QDir(QDir::homePath());
-QMap<QString, QString> zippedFiles;
+
 
 public:
     explicit FileManagerPlugin(QObject* parent, const QVariantList& args);
@@ -64,6 +62,7 @@ private Q_SLOTS:
     void sendError(const QString& errorMsg);
 
 Q_SIGNALS:
+    void fileDeleted(const QString& filename);
     void listingNeedsUpdate();
     void errorNeedsSending(const QString& errorMsg);
 
@@ -78,13 +77,21 @@ private:
     bool _delete(const QString& path);
     void deleteFile(const QString& path);
     void rename(const QString& path, const QString& newname);
-    void sendErrorPacket(const QString& errorMsg);
+    void sendMsgPacket(const QString& msg);
     QString genRandomString(const qint16 maxLength = 8);
     void runCommand(const QString& cmd);
     void runCommand(const QString& cmd, const QString& wd);
     void makeDirectory(const QString& path);
     QProcess* commandProcess(const QString& cmd);
     void shareFileForViewing(const QString& path, const QString& dest);
+    void finished(KJob* job);
+
+    bool showHidden = false;
+    QRandomGenerator* random = new QRandomGenerator();
+    const QString possibleChars = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+    QDir* directory = new QDir(QDir::homePath());
+    QMap<QString, QString> zippedFiles;
+
 };
 
 #endif

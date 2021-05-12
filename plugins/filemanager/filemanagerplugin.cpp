@@ -3,13 +3,13 @@
 #include <KPluginFactory>
 
 #include <QDBusConnection>
-
 #include <core/networkpacket.h>
 #include <core/device.h>
 #include <core/daemon.h>
 #include "interfaces/dbushelpers.h"
 #include "plugin_filemanager_debug.h"
 #include <dbushelper.h>
+
 #define PACKET_TYPE_FILEMANAGER QStringLiteral("kdeconnect.filemanager")
 
 K_PLUGIN_CLASS_WITH_JSON(FileManagerPlugin, "kdeconnect_filemanager.json")
@@ -79,7 +79,7 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
       QString dest;
       if (np.has(QStringLiteral("dest"))) {
         dest = np.get<QString>(QStringLiteral("dest"));
-      } else { sendErrorPacket(QStringLiteral("failed; no dest received")); return true; }
+      } else { sendMsgPacket(QStringLiteral("failed; no dest received")); return true; }
       shareFileForViewing(filepath, dest);
     }
   }
@@ -106,6 +106,29 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
   else if (np.has(QStringLiteral("togglehidden")) && np.get<bool>(QStringLiteral("togglehidden"))) {
     showHidden = !showHidden;
     sendListing();
+  }
+
+  else if (np.hasPayload() || np.has(QStringLiteral("filename"))) {
+    const QString filename = np.get<QString>(QStringLiteral("filename"));
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "got payload for" << filename;
+
+    // first remove file; FileTransferJob will error if it already exists
+    QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::deleteFile, filename);
+    connect(this, &FileManagerPlugin::fileDeleted, this, [this, np](const QString& filename) {
+      QUrl destination = QUrl::fromLocalFile(filename);
+      if (np.hasPayload()) {
+        FileTransferJob* job = np.createPayloadTransferJob(destination);
+        connect(job, &KJob::result, this, [this](KJob* job) { finished(job); });
+        job->start();
+
+      } else {
+          // create empty file
+          QFile file(destination.toLocalFile());
+          file.open(QIODevice::WriteOnly);
+          file.close();
+      }
+    });
+
   }
 
   return true;
@@ -357,7 +380,7 @@ void FileManagerPlugin::sendArchive(const QString& directoryPath) {
     }
     else {
       qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "could not create archive";
-      sendErrorPacket(QStringLiteral("Could not create archive!"));
+      sendMsgPacket(QStringLiteral("Could not create archive!"));
     }
 }
 
@@ -382,8 +405,10 @@ void FileManagerPlugin::deleteFile(const QString& path) {
 
   if (success) {
     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "successfully deleted" << path;
-    Q_EMIT updateListing();
+    Q_EMIT listingNeedsUpdate();
+    Q_EMIT fileDeleted(path);
     return;
+
   } else {
     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "could not delete" << path;
     Q_EMIT errorNeedsSending(QString(QStringLiteral("Error deleting file %1").arg(path)));
@@ -421,12 +446,12 @@ void FileManagerPlugin::updateListing() {
 }
 
 
-void FileManagerPlugin::sendError(const QString& errorMsg) {
-  sendErrorPacket(errorMsg);
+void FileManagerPlugin::sendError(const QString& msg) {
+  sendMsgPacket(msg);
 }
 
 
-void FileManagerPlugin::sendErrorPacket(const QString& errorMsg) {
+void FileManagerPlugin::sendMsgPacket(const QString& errorMsg) {
   NetworkPacket np(PACKET_TYPE_FILEMANAGER);
   np.set<QString>(QStringLiteral("Error"), errorMsg);
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "created error packet with msg" << errorMsg;
@@ -482,5 +507,18 @@ void FileManagerPlugin::shareFileForViewing(const QString& path, const QString& 
 
     sendPacket(packet);
 }
+
+
+void FileManagerPlugin::finished(KJob* job) {
+  FileTransferJob* ftjob = qobject_cast<FileTransferJob*>(job);
+  if (ftjob && !job->error()) {
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "File transfer finished." << ftjob->destination();
+  } else {
+      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "File transfer failed." << (ftjob ? ftjob->destination() : QUrl()) << job->errorText();
+      sendMsgPacket(QString(QStringLiteral("upload failed for %1\nerror: %2")).arg(ftjob->destination().toString()).arg(job->errorText()));
+  }
+}
+
+
 
 #include "filemanagerplugin.moc"

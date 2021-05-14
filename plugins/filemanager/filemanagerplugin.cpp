@@ -23,6 +23,7 @@ FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
 
      connect(this, &FileManagerPlugin::listingNeedsUpdate, this, &FileManagerPlugin::updateListing);
      connect(this, &FileManagerPlugin::errorNeedsSending, this, &FileManagerPlugin::sendError);
+     connect(this, &FileManagerPlugin::fileDeleted, this, &FileManagerPlugin::replaceFile);
 }
 
 
@@ -112,22 +113,22 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
     const QString filename = np.get<QString>(QStringLiteral("filename"));
     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "got payload for" << filename;
 
-    // first remove file; FileTransferJob will error if it already exists
-    QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::deleteFile, filename);
-    connect(this, &FileManagerPlugin::fileDeleted, this, [this, np](const QString& filename) {
-      QUrl destination = QUrl::fromLocalFile(filename);
-      if (np.hasPayload()) {
-        FileTransferJob* job = np.createPayloadTransferJob(destination);
-        connect(job, &KJob::result, this, [this](KJob* job) { finished(job); });
-        job->start();
+    QUrl destination = QUrl::fromLocalFile(filename);
+    if (np.hasPayload()) {
+      FileTransferJob* job = np.createPayloadTransferJob(destination);
+      // this will emit fileDeleted, which will trigger replaceFile
+      QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::deleteFileForReplacement, filename, job);
+      // connect(job, &KJob::result, this, [this](KJob* job) { finished(job); });
+      // job->start();
 
-      } else {
-          // create empty file
-          QFile file(destination.toLocalFile());
-          file.open(QIODevice::WriteOnly);
-          file.close();
-      }
-    });
+    } else {
+        // create empty file
+        QFile file(destination.toLocalFile());
+        file.open(QIODevice::WriteOnly);
+        file.close();
+    }
+
+
 
   }
 
@@ -400,19 +401,19 @@ bool FileManagerPlugin::_delete(const QString& path) {
 }
 
 
-void FileManagerPlugin::deleteFile(const QString& path) {
+bool FileManagerPlugin::deleteFile(const QString& path) {
   bool success = _delete(path);
 
   if (success) {
     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "successfully deleted" << path;
     Q_EMIT listingNeedsUpdate();
-    Q_EMIT fileDeleted(path);
-    return;
 
   } else {
     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "could not delete" << path;
     Q_EMIT errorNeedsSending(QString(QStringLiteral("Error deleting file %1").arg(path)));
   }
+
+  return success;
 
 }
 
@@ -454,7 +455,7 @@ void FileManagerPlugin::sendError(const QString& msg) {
 void FileManagerPlugin::sendMsgPacket(const QString& errorMsg) {
   NetworkPacket np(PACKET_TYPE_FILEMANAGER);
   np.set<QString>(QStringLiteral("Error"), errorMsg);
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "created error packet with msg" << errorMsg;
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "created msg packet with msg" << errorMsg;
   sendPacket(np);
 }
 
@@ -506,6 +507,33 @@ void FileManagerPlugin::shareFileForViewing(const QString& path, const QString& 
     }
 
     sendPacket(packet);
+}
+
+
+void FileManagerPlugin::deleteFileForReplacement(const QString& path, FileTransferJob* job) {
+  bool success = deleteFile(path);
+
+  if (success) {
+    Q_EMIT fileDeleted(path, job);
+  }
+}
+
+
+void FileManagerPlugin::replaceFile(const QString& path, FileTransferJob* job) {
+  connect(job, &KJob::result, this, [this](KJob* kjob) { finished(kjob); });
+  job->start();
+  // QUrl destination = QUrl::fromLocalFile(path);
+  // if (np->hasPayload()) {
+  //   FileTransferJob* job = np->createPayloadTransferJob(destination);
+  //   connect(job, &KJob::result, this, [this](KJob* job) { finished(job); });
+  //   job->start();
+  //
+  // } else {
+  //     // create empty file
+  //     QFile file(destination.toLocalFile());
+  //     file.open(QIODevice::WriteOnly);
+  //     file.close();
+  // }
 }
 
 

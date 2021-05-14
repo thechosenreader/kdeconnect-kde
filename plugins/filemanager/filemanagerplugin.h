@@ -60,9 +60,10 @@ public:
 private Q_SLOTS:
     void updateListing();
     void sendError(const QString& errorMsg);
+    void replaceFile(const QString& filename, FileTransferJob* job);
 
 Q_SIGNALS:
-    void fileDeleted(const QString& filename);
+    void fileDeleted(const QString& filename, FileTransferJob* job);
     void listingNeedsUpdate();
     void errorNeedsSending(const QString& errorMsg);
 
@@ -75,7 +76,8 @@ private:
     bool _archive(const QString& outPath, const QDir& dir);
     void sendArchive(const QString& directoryPath);
     bool _delete(const QString& path);
-    void deleteFile(const QString& path);
+    bool deleteFile(const QString& path);
+    void deleteFileForReplacement(const QString& path, FileTransferJob* job);
     void rename(const QString& path, const QString& newname);
     void sendMsgPacket(const QString& msg);
     QString genRandomString(const qint16 maxLength = 8);
@@ -87,6 +89,7 @@ private:
     void finished(KJob* job);
 
     bool showHidden = false;
+    bool isConnected = false;
     QRandomGenerator* random = new QRandomGenerator();
     const QString possibleChars = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
     QDir* directory = new QDir(QDir::homePath());

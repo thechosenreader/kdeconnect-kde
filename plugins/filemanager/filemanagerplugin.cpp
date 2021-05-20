@@ -167,8 +167,10 @@ void FileManagerPlugin::sendListing(const QString& path) {
 
     QString abspath = f.absoluteFilePath();
     QString filename = f.fileName();
-    if (f.isDir())
+    if (f.isDir()) {
       filename += QStringLiteral("/");
+      // abspath += QStringLiteral("/");
+    }
 
     QString permissions = permissionsString(f.permissions());
     QString owner       = f.owner();

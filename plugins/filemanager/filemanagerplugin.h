@@ -68,7 +68,7 @@ Q_SIGNALS:
     void errorNeedsSending(const QString& errorMsg);
 
 private:
-    void sendListing(){ sendListing(directory->cleanPath(directory->absolutePath())); }
+    void sendListing(){ sendListing(directory.cleanPath(directory.absolutePath())); }
     void sendListing(const QString& path);
     QString permissionsString(QFileDevice::Permissions permissions);
     void sendFile(const QString& path);
@@ -90,9 +90,10 @@ private:
 
     bool showHidden = false;
     bool isConnected = false;
-    QRandomGenerator* random = new QRandomGenerator();
+    QRandomGenerator random = QRandomGenerator::securelySeeded();
     const QString possibleChars = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-    QDir* directory = new QDir(QDir::homePath());
+    QDir directory;
+    QTemporaryDir* tmpDir;
     QMap<QString, QString> zippedFiles;
 
 };

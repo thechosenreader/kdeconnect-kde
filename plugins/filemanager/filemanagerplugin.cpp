@@ -18,12 +18,28 @@ K_PLUGIN_CLASS_WITH_JSON(FileManagerPlugin, "kdeconnect_filemanager.json")
 
 FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
     : KdeConnectPlugin(parent, args)
+    , directory(QDir::homePath())
 {
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "FILEMANAGER plugin constructor for device" << device()->name();
 
      connect(this, &FileManagerPlugin::listingNeedsUpdate, this, &FileManagerPlugin::updateListing);
      connect(this, &FileManagerPlugin::errorNeedsSending, this, &FileManagerPlugin::sendError);
      connect(this, &FileManagerPlugin::fileDeleted, this, &FileManagerPlugin::replaceFile);
+
+     // remove the cache as some sorta fucky (lazy) maintenance protocol
+     QDir(QString(QStringLiteral("%1/.kdeconnect/cache")).arg(QDir::homePath())).removeRecursively();
+     directory.mkpath(QString(QStringLiteral("%1/.kdeconnect/cache")).arg(QDir::homePath()));
+     tmpDir = new QTemporaryDir(QString(QStringLiteral("%1/.kdeconnect/cache/")).arg(QDir::homePath()));
+
+     if (tmpDir->isValid()) {
+         qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "created tmp dir in" << tmpDir->path();
+     } else {
+         qCWarning(KDECONNECT_PLUGIN_FILEMANAGER) << "could not create tmp dir" << tmpDir->errorString();
+         delete tmpDir;
+         tmpDir = new QTemporaryDir(QDir::tempPath() + QStringLiteral("/kdeconnect_XXXXXX"));
+     }
+
+     tmpDir->setAutoRemove(true);
 }
 
 
@@ -98,7 +114,7 @@ bool FileManagerPlugin::receivePacket(NetworkPacket const& np){
       QString wd;
       if (np.has(QStringLiteral("wd"))) {
         wd = np.get<QString>(QStringLiteral("wd"));
-      } else { wd = directory->absolutePath(); }
+      } else { wd = directory.absolutePath(); }
       qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "starting thread to run" << cmd << "in" << wd;
       QFuture<void> future = QtConcurrent::run(this, &FileManagerPlugin::runCommand, cmd, wd);
     }
@@ -142,23 +158,23 @@ void FileManagerPlugin::connected() {
 
 
 void FileManagerPlugin::sendListing(const QString& path) {
-  QFileInfo finfo(directory->filePath(path));
+  QFileInfo finfo(directory.filePath(path));
   QJsonObject* listing = new QJsonObject();
 
   if (finfo.isDir()) {
-    directory->cd(path);
+    directory.cd(path);
   } else {
-    directory->cd(finfo.absoluteDir().absolutePath());
+    directory.cd(finfo.absoluteDir().absolutePath());
     if (finfo.exists()) {
       qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "sending file" << path;
       sendFile(finfo.absoluteFilePath());
     }
   }
 
-  directory->setPath(directory->absolutePath());
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "cwd is" << directory->absolutePath();
+  directory.setPath(directory.absolutePath());
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "cwd is" << directory.absolutePath();
 
-  QList<QFileInfo> files = directory->entryInfoList(QDir::NoDot | QDir::AllEntries | (showHidden ? QDir::Hidden : QFlags<QDir::Filter>(0x0)));
+  QList<QFileInfo> files = directory.entryInfoList(QDir::NoDot | QDir::AllEntries | (showHidden ? QDir::Hidden : QFlags<QDir::Filter>(0x0)));
 
   QList<QFileInfo>::iterator i;
   for (i = files.begin(); i != files.end(); i++) {
@@ -197,7 +213,7 @@ void FileManagerPlugin::sendListing(const QString& path) {
 
   NetworkPacket netpacket(PACKET_TYPE_FILEMANAGER);
   netpacket.set<QString>(QStringLiteral("directoryListing"), listingJSON);
-  QString temp = directory->cleanPath(directory->absolutePath());
+  QString temp = directory.cleanPath(directory.absolutePath());
   netpacket.set<QString>(QStringLiteral("directoryPath"), temp);
 
   sendPacket(netpacket);
@@ -352,7 +368,7 @@ QString FileManagerPlugin::genRandomString(const qint16 maxLength) {
   QString out;
 
   for (qint16 i = 0; i < maxLength; i++) {
-    qint16 randIndex = random->generate() % possibleChars.length();
+    qint16 randIndex = random.generate() % possibleChars.length();
     out.append(possibleChars.at(randIndex));
   }
 
@@ -373,7 +389,7 @@ void FileManagerPlugin::sendArchive(const QString& directoryPath) {
     }
 
     QDir targetDir(directoryPath);
-    QString newLocation = QString(QStringLiteral("%1/%2_%3%4")).arg(QDir::tempPath()).arg(targetDir.dirName()).arg(genRandomString()).arg(QStringLiteral(".zip"));
+    QString newLocation = QString(QStringLiteral("%1/%2_%3%4")).arg(tmpDir->path()).arg(targetDir.dirName()).arg(genRandomString()).arg(QStringLiteral(".zip"));
     zippedFiles.insert(directoryPath, newLocation);
 
     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "creating new archive at" << newLocation;
@@ -397,7 +413,7 @@ bool FileManagerPlugin::_delete(const QString& path) {
   }
 
   else {
-    return directory->remove(path);
+    return directory.remove(path);
   }
 
 }
@@ -421,8 +437,8 @@ bool FileManagerPlugin::deleteFile(const QString& path) {
 
 
 void FileManagerPlugin::rename(const QString& path, const QString& newname) {
-  QFileInfo current(directory->absoluteFilePath(path));
-  QFileInfo target(directory->absoluteFilePath(newname));
+  QFileInfo current(directory.absoluteFilePath(path));
+  QFileInfo target(directory.absoluteFilePath(newname));
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "current" << current.fileName();
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "target" << target.absoluteFilePath();
   QString targetName;
@@ -431,7 +447,7 @@ void FileManagerPlugin::rename(const QString& path, const QString& newname) {
     // this way, we can mimic the behaviour of mv: mv file dir -> dir/file
     targetName = QString(QStringLiteral("%1/%2")).arg(target.absoluteFilePath()).arg(current.fileName());
   } else { targetName = newname; }
-  bool success = directory->rename(path, targetName);
+  bool success = directory.rename(path, targetName);
 
   if (success) {
     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "successfully renamed" << path << "to" << targetName;
@@ -473,11 +489,11 @@ void FileManagerPlugin::runCommand(const QString& cmd, const QString& wd) {
 
 
 void FileManagerPlugin::runCommand(const QString& cmd) {
-  runCommand(cmd, directory->absolutePath());
+  runCommand(cmd, directory.absolutePath());
 }
 
 void FileManagerPlugin::makeDirectory(const QString& path) {
-  bool success = directory->mkpath(path);
+  bool success = directory.mkpath(path);
   if (success) {
     Q_EMIT updateListing();
   } else {

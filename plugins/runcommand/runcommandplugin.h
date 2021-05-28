@@ -40,7 +40,11 @@ private Q_SLOTS:
 
 private:
     void sendConfig();
+    void updateCMDandARGS();
     QProcess* commandProcess(const QString& cmd);
+
+    QString COMMAND;
+    QString ARGS;
 
 };
 

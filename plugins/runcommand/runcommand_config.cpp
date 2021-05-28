@@ -6,6 +6,7 @@
 
 #include "runcommand_config.h"
 
+#include <QLabel>
 #include <QTableView>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -21,6 +22,17 @@
 #include <KPluginFactory>
 
 #include <dbushelper.h>
+
+#ifdef Q_OS_WIN
+#define COMMAND "cmd"
+#define ARGS "/c"
+
+#else
+#define COMMAND "/bin/sh"
+#define ARGS "-c"
+
+#endif
+
 
 K_PLUGIN_FACTORY(ShareConfigFactory, registerPlugin<RunCommandConfig>();)
 
@@ -46,12 +58,24 @@ RunCommandConfig::RunCommandConfig(QWidget* parent, const QVariantList& args)
 
     QTableView* table = new QTableView(this);
     table->horizontalHeader()->setStretchLastSection(true);
-    table->verticalHeader()->setVisible(false);
+    table->verticalHeader()->setVisible(true);
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->addWidget(table);
     QPushButton* button = new QPushButton(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Sample commands"), this);
     button->setMenu(defaultMenu);
     layout->addWidget(button);
+
+    QHBoxLayout* hlayoutCommand = new QHBoxLayout(this);
+    commandEdit = new QLineEdit(this);
+    QLabel* l1 = new QLabel(QStringLiteral("Shell program (default: %1)").arg(QStringLiteral(COMMAND)));
+    layout->addWidget(l1);
+    layout->addWidget(commandEdit);
+
+    QHBoxLayout* hlayoutArgs = new QHBoxLayout(this);
+    argsEdit = new QLineEdit(this);
+    QLabel* l2 = new QLabel(QStringLiteral("Options (default: %1)").arg(QStringLiteral(ARGS)));
+    layout->addWidget(l2);
+    layout->addWidget(argsEdit);
 
     setLayout(layout);
 
@@ -106,9 +130,15 @@ void RunCommandConfig::load()
     }
 
     m_entriesModel->sort(0);
-
     insertEmptyRow();
+
+    commandEdit->setText(config()->getString(QStringLiteral("shellExe"), QStringLiteral(COMMAND)));
+    argsEdit->setText(config()->getString(QStringLiteral("shellExeArgs"), QStringLiteral(ARGS)));
+
+    qDebug() << "CHILLING" << "load()";
     connect(m_entriesModel, &QAbstractItemModel::dataChanged, this, &RunCommandConfig::onDataChanged);
+    connect(commandEdit, &QLineEdit::textEdited, this, [=](QString text) {save();});
+    connect(argsEdit, &QLineEdit::textEdited, this, [=](QString text) {save();});
 
     Q_EMIT changed(false);
 }
@@ -137,6 +167,10 @@ void RunCommandConfig::save()
     QJsonDocument document;
     document.setObject(jsonConfig);
     config()->set(QStringLiteral("commands"), document.toJson(QJsonDocument::Compact));
+
+    config()->set(QStringLiteral("shellExe"), commandEdit->text());
+    config()->set(QStringLiteral("shellExeArgs"), argsEdit->text());
+    qDebug() << "CHILLING" << "setting shellExe and args to" << commandEdit->text() << argsEdit->text();
 
     KCModule::save();
 

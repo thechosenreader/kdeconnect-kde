@@ -8,6 +8,7 @@
 #define RUNCOMMAND_CONFIG_H
 
 #include "kcmplugin/kdeconnectpluginkcm.h"
+#include <QLineEdit>
 
 class QMenu;
 class QStandardItemModel;
@@ -27,12 +28,16 @@ public Q_SLOTS:
 
 private Q_SLOTS:
     void onDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);
+    // void onTextChanged(const QString& text);
+
 private:
     void addSuggestedCommand(QMenu* menu, const QString &name, const QString &command);
     void insertRow(int i, const QString &name, const QString &command);
     void insertEmptyRow();
 
     QStandardItemModel* m_entriesModel;
+    QLineEdit* commandEdit;
+    QLineEdit* argsEdit;
 
 };
 

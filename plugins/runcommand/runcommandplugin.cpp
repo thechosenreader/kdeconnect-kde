@@ -23,13 +23,14 @@
 
 #define PACKET_TYPE_RUNCOMMAND QStringLiteral("kdeconnect.runcommand")
 
+// these are used as defaults when fetching from config
 #ifdef Q_OS_WIN
-#define COMMAND "cmd"
-#define ARGS "/c"
+#define _COMMAND "cmd"
+#define _ARGS "/c"
 
 #else
-#define COMMAND "/bin/sh"
-#define ARGS "-c"
+#define _COMMAND "/bin/sh"
+#define _ARGS "-c"
 
 #endif
 
@@ -40,6 +41,7 @@ RunCommandPlugin::RunCommandPlugin(QObject* parent, const QVariantList& args)
 {
     qCDebug(KDECONNECT_PLUGIN_RUNCOMMAND) << "RUNCOMMAND plugin constructor for device" << device()->name();
     connect(config(), &KdeConnectPluginConfig::configChanged, this, &RunCommandPlugin::configChanged);
+    updateCMDandARGS();
 }
 
 RunCommandPlugin::~RunCommandPlugin()
@@ -59,14 +61,9 @@ bool RunCommandPlugin::receivePacket(const NetworkPacket& np)
         QString key = np.get<QString>(QStringLiteral("key"));
         QJsonValue value = commands[key];
 
-	QVariantMap np_body = np.body();
-	QVariantMap::iterator i;
-	for (i = np_body.begin(); i != np_body.end(); i++)
-		qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Key: " << i.key() << "\nValue:  " << i.value();
-
-        if (value == QJsonValue::Undefined) {
-            qCWarning(KDECONNECT_PLUGIN_RUNCOMMAND) << key << "is not a configured command";
-        }
+    if (value == QJsonValue::Undefined) {
+        qCWarning(KDECONNECT_PLUGIN_RUNCOMMAND) << key << "is not a configured command";
+    }
 
 	else if (np.has(QStringLiteral("rawCommand"))) {
 		QString rawCommand = np.get<QString>(QStringLiteral("rawCommand"));
@@ -104,15 +101,22 @@ void RunCommandPlugin::sendConfig()
     sendPacket(np);
 }
 
+void RunCommandPlugin::updateCMDandARGS() {
+
+    COMMAND = config()->getString(QStringLiteral("shellExe"), QStringLiteral(_COMMAND));
+    ARGS = config()->getString(QStringLiteral("shellExeArgs"), QStringLiteral(_ARGS));
+}
+
 void RunCommandPlugin::configChanged() {
+    updateCMDandARGS();
     sendConfig();
 }
 
 QProcess* RunCommandPlugin::commandProcess(const QString& cmd) {
   qCInfo(KDECONNECT_PLUGIN_RUNCOMMAND) << "Running:" << COMMAND << ARGS << cmd;
   QProcess* proc = new QProcess();
-  proc->setProgram(QStringLiteral(COMMAND));
-  proc->setArguments(QStringList() << QStringLiteral(ARGS) << cmd);
+  proc->setProgram(COMMAND);
+  proc->setArguments(QStringList() << ARGS << cmd);
   return proc;
 }
 

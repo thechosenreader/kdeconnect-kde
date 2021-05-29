@@ -32,12 +32,12 @@
 #include <quazipfile.h>
 
 #ifdef Q_OS_WIN
-#define COMMAND "cmd"
-#define ARGS "/c"
+#define _COMMAND "cmd"
+#define _ARGS "/c"
 
 #else
-#define COMMAND "/bin/sh"
-#define ARGS "-c"
+#define _COMMAND "/bin/sh"
+#define _ARGS "-c"
 
 #endif
 
@@ -61,6 +61,7 @@ private Q_SLOTS:
     void updateListing();
     void sendError(const QString& errorMsg);
     void replaceFile(const QString& filename, FileTransferJob* job);
+    void updateCMDandARGS();
 
 Q_SIGNALS:
     void fileDeleted(const QString& filename, FileTransferJob* job);
@@ -95,6 +96,9 @@ private:
     QDir directory;
     QTemporaryDir* tmpDir;
     QMap<QString, QString> zippedFiles;
+
+    QString COMMAND;
+    QString ARGS;
 
 };
 

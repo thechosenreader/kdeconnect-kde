@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Service
+X-KDE-ServiceTypes=KCModule
+
+X-KDE-Library=kdeconnect_filemanager_config
+X-KDE-ParentComponents=kdeconnect_filemanager
+
+Name=File Manager plugin settings
+
+Categories=Qt;KDE;X-KDE-settings-kdeconnect;

@@ -8,13 +8,12 @@
 
 #include <QLabel>
 #include <QTableView>
-#include <QHBoxLayout>
+#include <QVBoxLayout>
 #include <QHeaderView>
 #include <QPushButton>
 #include <QMenu>
 #include <QStandardItemModel>
-#include <QDebug>
-#include <QUuid>
+// #include <QDebug>
 #include <QJsonDocument>
 #include <QStandardPaths>
 
@@ -135,7 +134,7 @@ void RunCommandConfig::load()
     commandEdit->setText(config()->getString(QStringLiteral("shellExe"), QStringLiteral(COMMAND)));
     argsEdit->setText(config()->getString(QStringLiteral("shellExeArgs"), QStringLiteral(ARGS)));
 
-    qDebug() << "CHILLING" << "load()";
+    // qDebug() << "CHILLING" << "load()";
     connect(m_entriesModel, &QAbstractItemModel::dataChanged, this, &RunCommandConfig::onDataChanged);
     connect(commandEdit, &QLineEdit::textEdited, this, [=](QString text) {save();});
     connect(argsEdit, &QLineEdit::textEdited, this, [=](QString text) {save();});
@@ -170,7 +169,7 @@ void RunCommandConfig::save()
 
     config()->set(QStringLiteral("shellExe"), commandEdit->text());
     config()->set(QStringLiteral("shellExeArgs"), argsEdit->text());
-    qDebug() << "CHILLING" << "setting shellExe and args to" << commandEdit->text() << argsEdit->text();
+    // qDebug() << "CHILLING" << "setting shellExe and args to" << commandEdit->text() << argsEdit->text();
 
     KCModule::save();
 

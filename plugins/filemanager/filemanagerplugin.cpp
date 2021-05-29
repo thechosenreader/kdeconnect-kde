@@ -25,6 +25,9 @@ FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
      connect(this, &FileManagerPlugin::listingNeedsUpdate, this, &FileManagerPlugin::updateListing);
      connect(this, &FileManagerPlugin::errorNeedsSending, this, &FileManagerPlugin::sendError);
      connect(this, &FileManagerPlugin::fileDeleted, this, &FileManagerPlugin::replaceFile);
+     connect(config(), &KdeConnectPluginConfig::configChanged, this, &FileManagerPlugin::updateCMDandARGS);
+
+     updateCMDandARGS();
 
      // remove the cache as some sorta fucky (lazy) maintenance protocol
      QDir(QString(QStringLiteral("%1/.kdeconnect/cache")).arg(QDir::homePath())).removeRecursively();
@@ -441,20 +444,28 @@ void FileManagerPlugin::rename(const QString& path, const QString& newname) {
   QFileInfo target(directory.absoluteFilePath(newname));
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "current" << current.fileName();
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "target" << target.absoluteFilePath();
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "exists:" << QFileInfo::exists(target.absoluteFilePath()) << "isDir:" << target.isDir();
   QString targetName;
-  if (target.exists() && target.isDir()) {
+  if (QFileInfo::exists(target.absoluteFilePath()) && target.isDir()) {
+    // QFile::rename seems to fail when target is a symlink so we avoid them
+    QString baseDir = (target.isSymLink()) ? target.symLinkTarget() : target.absoluteFilePath();
+
     // by default, rename fails whenever target exists
     // this way, we can mimic the behaviour of mv: mv file dir -> dir/file
-    targetName = QString(QStringLiteral("%1/%2")).arg(target.absoluteFilePath()).arg(current.fileName());
+    targetName = QString(QStringLiteral("%1/%2")).arg(baseDir).arg(current.fileName());
   } else { targetName = newname; }
-  bool success = directory.rename(path, targetName);
+
+  QFile file(current.absoluteFilePath());
+  bool success = file.rename(targetName);
 
   if (success) {
     qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "successfully renamed" << path << "to" << targetName;
     Q_EMIT updateListing();
   } else {
-    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "failed to rename" << path << "to" << targetName;
-    Q_EMIT errorNeedsSending(QString(QStringLiteral("Could not rename %1 to %2")).arg(path).arg(newname));
+    QString error = QStringLiteral("failed to rename %1 to %2; %3").arg(path).arg(targetName).arg(file.errorString());
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << error;
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << file.error();
+    Q_EMIT errorNeedsSending(error);
   }
 
 }
@@ -504,8 +515,8 @@ void FileManagerPlugin::makeDirectory(const QString& path) {
 QProcess* FileManagerPlugin::commandProcess(const QString& cmd) {
   qCInfo(KDECONNECT_PLUGIN_FILEMANAGER) << "Running:" << COMMAND << ARGS << cmd;
   QProcess* proc = new QProcess();
-  proc->setProgram(QStringLiteral(COMMAND));
-  proc->setArguments(QStringList() << QStringLiteral(ARGS) << cmd);
+  proc->setProgram(COMMAND);
+  proc->setArguments(QStringList() << ARGS << cmd);
   return proc;
 }
 
@@ -565,6 +576,12 @@ void FileManagerPlugin::finished(KJob* job) {
   }
 }
 
+void FileManagerPlugin::updateCMDandARGS() {
+
+    qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "updating cmd and args";
+    COMMAND = config()->getString(QStringLiteral("shellExe"), QStringLiteral(_COMMAND));
+    ARGS = config()->getString(QStringLiteral("shellExeArgs"), QStringLiteral(_ARGS));
+}
 
 
 #include "filemanagerplugin.moc"

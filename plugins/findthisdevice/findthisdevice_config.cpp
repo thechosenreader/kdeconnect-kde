@@ -76,7 +76,7 @@ void FindThisDeviceConfig::playSound()
 {
     const QString soundFile = m_ui->soundFileRequester->text();
 
-    QUrl soundURL = QUrl(soundFile);
+    QUrl soundURL = QUrl::fromLocalFile(soundFile);
     QMediaPlayer* player = new QMediaPlayer;
     player->setAudioRole(QAudio::Role(QAudio::NotificationRole));
     player->setMedia(soundURL);

@@ -6,8 +6,8 @@
 
 #include "core/filetransferjob.h"
 #include <core/kdeconnectplugin.h>
-#include <QFileSystemWatcher>
 
+#include <QFileSystemWatcher>
 #include <QString>
 #include <QDir>
 #include <QMap>
@@ -28,6 +28,8 @@
 #include <QtConcurrent>
 #include <QFlags>
 #include <QSharedPointer>
+
+
 #include <quazip.h>
 #include <quazipfile.h>
 
@@ -94,6 +96,7 @@ private:
     QRandomGenerator random = QRandomGenerator::securelySeeded();
     const QString possibleChars = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
     QDir directory;
+    QFileSystemWatcher fsWatcher;
     QTemporaryDir* tmpDir;
     QMap<QString, QString> zippedFiles;
 

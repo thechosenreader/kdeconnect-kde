@@ -19,13 +19,16 @@ K_PLUGIN_CLASS_WITH_JSON(FileManagerPlugin, "kdeconnect_filemanager.json")
 FileManagerPlugin::FileManagerPlugin(QObject* parent, const QVariantList& args)
     : KdeConnectPlugin(parent, args)
     , directory(QDir::homePath())
+    , fsWatcher(QStringList({directory.absolutePath()}))
 {
      qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "FILEMANAGER plugin constructor for device" << device()->name();
 
      connect(this, &FileManagerPlugin::listingNeedsUpdate, this, &FileManagerPlugin::updateListing);
+     connect(&fsWatcher, &QFileSystemWatcher::directoryChanged, [=] (const QString& path) {this->sendListing();});
      connect(this, &FileManagerPlugin::errorNeedsSending, this, &FileManagerPlugin::sendError);
      connect(this, &FileManagerPlugin::fileDeleted, this, &FileManagerPlugin::replaceFile);
      connect(config(), &KdeConnectPluginConfig::configChanged, this, &FileManagerPlugin::updateCMDandARGS);
+
 
      updateCMDandARGS();
 
@@ -164,6 +167,7 @@ void FileManagerPlugin::sendListing(const QString& path) {
   QFileInfo finfo(directory.filePath(path));
   QJsonObject* listing = new QJsonObject();
 
+  fsWatcher.removePath(directory.absolutePath());
   if (finfo.isDir()) {
     directory.cd(path);
   } else {
@@ -174,6 +178,7 @@ void FileManagerPlugin::sendListing(const QString& path) {
     }
   }
 
+  fsWatcher.addPath(directory.absolutePath());
   directory.setPath(directory.absolutePath());
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "cwd is" << directory.absolutePath();
 

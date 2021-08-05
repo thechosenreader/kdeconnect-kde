@@ -447,7 +447,7 @@ bool FileManagerPlugin::deleteFile(const QString& path) {
 void FileManagerPlugin::rename(const QString& path, const QString& newname) {
   QFileInfo current(directory.absoluteFilePath(path));
   QFileInfo target(directory.absoluteFilePath(newname));
-  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "current" << current.fileName();
+  qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "current" << current.absoluteFilePath();
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "target" << target.absoluteFilePath();
   qCDebug(KDECONNECT_PLUGIN_FILEMANAGER) << "exists:" << QFileInfo::exists(target.absoluteFilePath()) << "isDir:" << target.isDir();
   QString targetName;
@@ -458,7 +458,9 @@ void FileManagerPlugin::rename(const QString& path, const QString& newname) {
     // by default, rename fails whenever target exists
     // this way, we can mimic the behaviour of mv: mv file dir -> dir/file
     targetName = QString(QStringLiteral("%1/%2")).arg(baseDir).arg(current.fileName());
-  } else { targetName = newname; }
+  } else {
+    targetName = target.absoluteFilePath();
+  }
 
   QFile file(current.absoluteFilePath());
   bool success = file.rename(targetName);
